@@ -48,14 +48,14 @@ if __name__ == '__main__':
     use_distributed_cache = "1"
 
     for layer in range(num_layer - 1):
-        # Training phase (RBMMJob)
+        # Training phase (RBMMRJob)
         weights = init_weights(num_node_of_layer)
         for iter in range(1, max_epoch + 1):
             weight_file = f'weights-layer-{layer}-iter-{iter}.txt'
             load_weights_to_cache(weight_file, num_node_of_layer)
 
             # Run RBMMJob
-            run_map_reduce(input_file, output_file, 'RBMMJob.py', weights_file=weight_file)
+            run_map_reduce(input_file, output_file, 'RBMMRJob.py', weights_file=weight_file)
             
             # Update weights based on output
             
