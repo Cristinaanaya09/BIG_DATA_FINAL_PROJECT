@@ -1,6 +1,7 @@
 import subprocess
 import os
 import random
+import sys
 
 def load_weights_to_cache(weight_file, num_node_of_layer):
     # Load weights to distributed cache
@@ -33,16 +34,18 @@ def run_map_reduce(input_path, output_path, mapper_class, reducer_class, weights
 
 if __name__ == '__main__':
     # Argument format: /input_file/ /output_file/ maxiter layernum nodeNumofLayer1 nodeNumofLayer2 ...
-    input_file = '/path/to/input'
-    output_file = '/path/to/output'
-    max_epoch = 10
-    num_layer = 3
-    num_node_of_layer = [int(sys.argv[i]) for i in range(5, len(sys.argv))] # Modify the input method if needed
+    if len(sys.argv) < 7:
+        print("Usage: python script.py /path/to/input /path/to/output maxiter layernum nodeNumofLayer1 nodeNumofLayer2 ...")
+        sys.exit(1)
+
+    input_file = sys.argv[1]
+    output_file = sys.argv[2]
+    max_epoch = int(sys.argv[3])
+    num_layer = int(sys.argv[4])
+    num_node_of_layer = [int(sys.argv[i]) for i in range(5, len(sys.argv))]
 
     num_case = 60000
-
     epoch_in_mapper = 1
-
     use_distributed_cache = "1"
 
     for layer in range(num_layer - 1):
