@@ -37,7 +37,7 @@ if __name__ == '__main__':
     output_file = '/path/to/output'
     max_epoch = 10
     num_layer = 3
-    num_node_of_layer = [int(input()) for _ in range(num_layer)]  # Modify the input method if needed
+    num_node_of_layer = [int(sys.argv[i]) for i in range(5, len(sys.argv))] # Modify the input method if needed
 
     num_case = 60000
 
