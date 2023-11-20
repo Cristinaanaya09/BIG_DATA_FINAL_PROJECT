@@ -15,16 +15,15 @@ def init_weights(num_node_of_layer):
     # Initialize weights
     return [0.1 * random.gauss(0, 1) for _ in range(num_node_of_layer[0] * num_node_of_layer[1])]
 
-def run_map_reduce(input_path, output_path, mapper_class, reducer_class, weights_file=None):
+def run_map_reduce(input_path, output_path, mapper_reducer_script, weights_file=None):
     # Construct Hadoop Streaming command
     hadoop_cmd = [
         'hadoop', 'jar', '/path/to/hadoop-streaming.jar',
         '-input', input_path,
         '-output', output_path,
-        '-mapper', mapper_class,
-        '-reducer', reducer_class,
-        '-file', mapper_class,
-        '-file', reducer_class
+        '-mapper', mapper_reducer_script,
+        '-reducer', mapper_reducer_script,
+        '-file', mapper_reducer_script
     ]
 
     if weights_file:
