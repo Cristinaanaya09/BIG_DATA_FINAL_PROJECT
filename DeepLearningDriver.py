@@ -18,7 +18,7 @@ def init_weights(num_node_of_layer):
 def run_map_reduce(input_path, output_path, mapper_reducer_script, weights_file=None):
     # Construct Hadoop Streaming command
     hadoop_cmd = [
-        'hadoop', 'jar', '/path/to/hadoop-streaming.jar',
+        'hadoop', 'jar', '/usr/lib/hadoop/hadoop-streaming.jar',
         '-input', input_path,
         '-output', output_path,
         '-mapper', mapper_reducer_script,
