@@ -52,7 +52,7 @@ class RBMMRJob(MRJob):
 
     def map(self, _, line):
         # Map function
-        input_data = list(map(int, line.strip().split()))
+        input_data = [list(map(int, line.strip().split())) for line in data_str.split('\n')]
         data = np.array(input_data[:self.numdims]) / 255.0
         self.initialize()
         posprods, poshidstates = self.getposphase(data)
