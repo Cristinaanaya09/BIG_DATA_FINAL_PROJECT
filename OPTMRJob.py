@@ -12,7 +12,7 @@ class OPTMRJob(MRJob):
 
     def mapper(self, _, line):
         # Parse input data
-        input_data = list(map(int, line.strip().split()))
+        input_data = [list(map(int, line.strip().split())) for line in data_str.split('\n')]
         numdims = len(input_data)
 
         # Read weights from the distributed cache
