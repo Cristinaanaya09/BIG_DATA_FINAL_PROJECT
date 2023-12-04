@@ -1,10 +1,18 @@
 from mrjob.job import MRJob
 from mrjob.protocol import RawValueProtocol
 import numpy as np
+from mrjob.protocol import JSONProtocol
+
+
 
 class RBMMRJobMapper(MRJob):
 
-    OUTPUT_PROTOCOL = RawValueProtocol
+    OUTPUT_PROTOCOL = JSONProtocol
+
+    def __init__(self, *args, **kwargs):
+        super(RBMMRJobMapper, self).__init__(*args, **kwargs)
+        self.numdims = None
+        self.numhid = None
 
     def configure_args(self):
         super(RBMMRJobMapper, self).configure_args()
@@ -12,22 +20,26 @@ class RBMMRJobMapper(MRJob):
         self.add_passthru_arg('--numhid', type=int, help='Number of nodes in the hidden layer')
 
     def initialize(self):
-        # Initialize parameters and variables
-        # Note: In MRJob, we don't maintain state between different mapper calls, so some modifications are made
         self.epsilonw = 0.1
         self.weightcost = 0.000
         self.numhid = self.options.numhid
         self.numdims = self.options.numdims
+        self.vishid = np.random.rand(self.numdims, self.numhid) * 0.01
         self.vishidinc = np.zeros((self.numdims, self.numhid))
 
     def getposphase(self, data):
         # Perform positive phase calculations
-        poshidprobs = np.dot(data, self.vishid)
-        poshidprobs += np.zeros((1, self.numhid))
-        poshidprobs = 1 / (1 + np.exp(-poshidprobs))
-        posprods = np.dot(data.T, poshidprobs)
-        poshidstates = (np.random.rand(1, self.numhid) < poshidprobs).astype(float)
-        return posprods, poshidstates
+        poshidprobs = np.dot(data, self.vishid) #W.T(pesos)*y(data)
+        poshidprobs += np.zeros(poshidprobs.shape)
+        poshidprobs = 1 / (1 + np.exp(-poshidprobs)) #SIGMOID, 1/(1+e^-x)
+        posprods = np.dot(data.reshape(-1, 1), poshidprobs.reshape(1, -1))
+
+        # Ensure poshidstates has the right shape
+        poshidstates = (np.random.rand(self.numhid) < poshidprobs.flatten()).astype(float)
+
+        return posprods, poshidstates.reshape(1, -1)
+
+
 
     def getnegphase(self, poshidstates):
         # Perform negative phase calculations
@@ -47,9 +59,13 @@ class RBMMRJobMapper(MRJob):
 
     def mapper(self, _, line):
         # Map function
-        input_data = list(map(int, line.strip().split())) 
-        data = np.array(input_data[:self.numdims]) / 255.0
+        
+
         self.initialize()
+
+        input_data = list(map(int, line.strip().split()))
+        data = np.array(input_data[:self.numdims]) / 255.0
+
         posprods, poshidstates = self.getposphase(data)
         negprods = self.getnegphase(poshidstates)
         self.update(posprods, negprods)
@@ -57,7 +73,9 @@ class RBMMRJobMapper(MRJob):
         # Output the weight updates
         for i in range(self.numdims):
             for j in range(self.numhid):
-                yield f"{i * self.numhid + j}", float(self.vishidinc[i, j])
+                key = f"{i * self.numhid + j}"
+                value = str(float(self.vishidinc[i, j]))
+                yield key, value
 
 if __name__ == '__main__':
     RBMMRJobMapper.run()

@@ -1,38 +1,69 @@
-from mrjob.job import MRJob
-from mrjob.protocol import RawValueProtocol
 import numpy as np
+from mrjob.job import MRJob
+from mrjob.step import MRStep
+from mrjob.protocol import JSONProtocol
+
+def min_max_scaling(arr, new_min, new_max):
+    
+    current_min, current_max = np.min(arr), np.max(arr)
+    scaled_arr = (arr - current_min) / (current_max - current_min) * (new_max - new_min) + new_min
+
+    return scaled_arr
 
 class OPTMRJobMapper(MRJob):
-
-    OUTPUT_PROTOCOL = RawValueProtocol
-
     def configure_args(self):
         super(OPTMRJobMapper, self).configure_args()
-        self.add_file_arg('--weights', help='Path to the weights file')
+        self.add_passthru_arg('--numdims', type=int, help='Number of dimensions')
+        self.add_passthru_arg('--numhid', type=int, help='Number of hidden units')
+        self.add_file_arg('--weights', help='Path to weights file')
+
+    def mapper_init(self):
+        
+        self.epsilonw = 0.1
+        self.epsilonvb = 0.1
+        self.espilonhb = 0.1
+        self.weightcost = 0.000
+        self.initialmomentum = 0.5
+        self.finalmomentum = 0.9
+        self.numhid = self.options.numhid
+        self.numdims = self.options.numdims
+
+        self.data = np.zeros(self.numdims)
+        self.hidbiases = np.zeros(self.numhid)
+        self.visbiases = np.zeros(self.numdims)
+        self.poshidprobs = np.zeros(self.numhid)
+        self.neghidprobs = np.zeros(self.numhid)
+        self.posprods = np.zeros((self.numdims, self.numhid))
+        self.negprods = np.zeros((self.numdims, self.numhid))
+        self.vishidinc = np.zeros((self.numdims, self.numhid))
+
+        with open(self.options.weights, 'r') as weights_file:
+            weight_list = []
+            for line in weights_file:
+                tokens = line.strip().split('\t')
+                if len(tokens) == 2:
+                    feature_index = int(tokens[0].strip('"'))
+                    weight_value = float(tokens[1])
+                    weight_list.append((feature_index, weight_value))
+
+            weight_list.sort(key=lambda x: x[0])
+            sorted_weights = [weight_value for _, weight_value in weight_list]
+            self.vishid = np.array(sorted_weights).reshape(self.numdims, self.numhid)
+    
+
+    def prop2next_layer(self):
+        self.poshidprobs = self.data.dot(self.vishid) + self.hidbiases  # y*W + b
+        scaled_linear_term = min_max_scaling(self.poshidprobs, -1, 1)
+        self.poshidprobs = 1 / (1 + np.exp(-scaled_linear_term))  # SIGMOID: Data between 0 and 1
 
     def mapper(self, _, line):
-        # Parse input data
-        input_data = [list(map(int, line.strip().split())) for line in data_str.split('\n')]
-        numdims = len(input_data)
+        self.data = np.array(list(map(int, line.strip().split())))
+        self.prop2next_layer()
+        updated = self.poshidprobs.tolist()
 
-        # Read weights from the distributed cache
-        weights_file = self.options.weights
-        with open(weights_file, 'r') as f:
-            weights_line = f.readline().strip().split()
-            vishid = np.array(list(map(float, weights_line)))
-
-        # Initialize parameters
-        numhid = len(vishid) // numdims
-        hidbiases = np.zeros(numhid)
-        visbiases = np.zeros(numdims)
-
-        # Perform forward propagation
-        poshidprobs = np.dot(input_data, vishid).reshape(1, numhid) + hidbiases
-        poshidstates = (np.random.rand(1, numhid) < 1 / (1 + np.exp(-poshidprobs))).astype(float)
-
-        # Output the key and updated values
-        updated_values = ' '.join(map(str, poshidstates.flatten().astype(int)))
-        yield None, updated_values
+        yield None, updated
 
 if __name__ == '__main__':
+    OPTMRJobMapper.OUTPUT_PROTOCOL = JSONProtocol
     OPTMRJobMapper.run()
+
